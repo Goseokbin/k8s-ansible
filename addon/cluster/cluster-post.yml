@@ -1,0 +1,7 @@
+- name: Setup Cluster Post 
+  hosts: all
+  gather_facts: true
+  roles:
+  - {role: ../roles/nfs, tags: set_nfs}
+  - {role: ../roles/helm, tags: set_helm}
+  - {role: ../roles/nfs-csi, tags: set_nfs_csi}

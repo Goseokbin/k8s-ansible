@@ -1,0 +1,96 @@
+- name: NFS_CSI | Create dir
+  file:
+    path: /tmp/cluster-post/nfs-csi
+    state: directory
+  when: inventory_hostname == groups['all'][0]
+
+- name: NFS-CSI | helm repo add 
+  kubernetes.core.helm_repository:
+    name: nfs-subdir-external-provisioner 
+    repo_url: "https://kubernetes-sigs.github.io/nfs-subdir-external-provisioner/"
+  when: inventory_hostname == groups['all'][0]
+
+- name: NFS-CSI | deploy nfs-csi 
+  kubernetes.core.helm:
+    name: nfs-csi 
+    chart_ref: nfs-subdir-external-provisioner/nfs-subdir-external-provisioner 
+    release_namespace: "{{ nfs_csi_namespace }}" 
+    create_namespace: true
+    values:
+     nfs:
+        server: "{{ hostvars[groups['all'][0]]['ansible_default_ipv4']['address'] }}" 
+        path: "{{ nfs_dir }}"
+  when: inventory_hostname == groups['all'][0]
+
+- name: NFS-CSI | Wait for pod to be running
+  kubernetes.core.k8s_info: 
+    api_version: v1
+    kind: Pod
+    namespace: "{{ nfs_csi_namespace }}"
+    label_selectors: "app=nfs-subdir-external-provisioner"
+  register: pod_info
+  until: pod_info.resources | map(attribute='status.phase') | unique == ['Running']
+  retries: 60
+  delay: 5
+  when: inventory_hostname == groups['all'][0]
+
+- name: NFS-CSI | Copy StorageClass
+  template:
+    src: nfs-storageclass.yaml.j2
+    dest: /tmp/cluster-post/nfs-csi/nfs-storageclass.yaml
+  when: inventory_hostname == groups['all'][0]
+
+- name: NFS-CSI | Check if storageclass exits
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: StorageClass
+    name: "{{ nfs_storageclass_name }}"
+  register: storageclass_exists
+  when: inventory_hostname == groups['all'][0]
+ 
+- name: NFS-CSI | Create StorageClass
+  kubernetes.core.k8s:
+    state: present
+    src: /tmp/cluster-post/nfs-csi/nfs-storageclass.yaml
+  when: inventory_hostname == groups['all'][0] and not storageclass_exists
+
+- name: NFS-CSI | Copy Test Pod manifest
+  template:
+    src: test-pod.yaml.j2 
+    dest: /tmp/cluster-post/nfs-csi/test-pod.yaml
+  when: inventory_hostname == groups['all'][0]
+
+- name: NFS-CSI | Deploy Test pvc and Test Pod
+  kubernetes.core.k8s:
+    state: present
+    src: /tmp/cluster-post/nfs-csi/test-pod.yaml 
+  when: inventory_hostname == groups['all'][0]
+ 
+- name: NFS-CSI | Wait for pod to be running
+  kubernetes.core.k8s_info: 
+    api_version: v1
+    kind: Pod
+    namespace: "{{ nfs_csi_namespace }}"
+    label_selectors: "app=test-pod"
+  register: pod_info
+  until: pod_info.resources | map(attribute='status.phase') | unique == ['Succeeded']
+  retries: 60
+  delay: 1 
+  when: inventory_hostname == groups['all'][0]
+
+- debug:
+    msg: "NFS-PVC provisioned successfully!!"
+  when: inventory_hostname == groups['all'][0] and pod_info.resources | map(attribute='status.phase') | unique == ['Succeeded']
+
+- debug:
+    msg: "NFS-PVC provisioned failed!!"
+  when: inventory_hostname == groups['all'][0] and pod_info.resources | map(attribute='status.phase') | unique != ['Succeeded']
+
+- name: NFS_CSI | Delete Test resource
+  kubernetes.core.k8s:
+    state: absent 
+    src: /tmp/cluster-post/nfs-csi/test-pod.yaml 
+  when: inventory_hostname == groups['all'][0]
+
+
+

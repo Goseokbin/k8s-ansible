@@ -1,0 +1,23 @@
+- name: Install Helm | Create dir
+  file:
+    path: /tmp/cluster-post/helm
+    state: directory
+  when: inventory_hostname in groups['kube_control_plane']
+ 
+- name: Install Helm | Copy get_helm.sh
+  copy:
+    src: helm-v3.11.2.tar.gz 
+    dest: /tmp/cluster-post/helm/helm.tar
+  when: inventory_hostname in groups['kube_control_plane']
+
+- name: Install Helm | Unarchive tar
+  unarchive:
+     src: /tmp/cluster-post/helm/helm.tar
+     dest: /tmp/cluster-post/helm/
+  when: inventory_hostname in groups['kube_control_plane']
+
+- name: Install helm | install helm
+  become: true
+  shell: mv /tmp/cluster-post/helm/linux-amd64/helm /usr/bin/helm 
+  when: inventory_hostname in groups['kube_control_plane']
+

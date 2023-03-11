@@ -1,0 +1,3 @@
+nfs_dir: /share
+nfs_csi_namespace: nfs-csi
+nfs_storageclass_name: nfs-client

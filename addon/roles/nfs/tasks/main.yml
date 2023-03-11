@@ -1,0 +1,59 @@
+- name: NFS-server | apt update
+  become: true
+  apt:
+    name:
+    - nfs-common
+    - nfs-kernel-server
+    - rpcbind
+    - portmap
+    update_cache: yes
+
+- name: NFS-server | create nfs dir
+  become: true
+  file:
+    path: /{{nfs_dir}}
+    state: directory
+    mode: 0777
+  when: inventory_hostname == groups['all'][0]
+
+- name: NFS-server | set exportfs
+  become: true
+  lineinfile:
+    path: /etc/exports
+    line: "{{nfs_dir}} {{ hostvars[groups['all'][0]]['ansible_default_ipv4']['address'] }}/16(rw,sync)"
+    regexp: "^{{nfs_dir}} {{ hostvars[groups['all'][0]]['ansible_default_ipv4']['address'] }}/16(rw,sync)$"
+    state: present
+  when: inventory_hostname == groups['all'][0]
+
+- name: NFS-server | set restart nfs
+  become: true
+  service:
+    name: nfs-kernel-server
+    state: restarted
+  when: inventory_hostname == groups['all'][0]
+
+- name: NFS-client | create nfs dir
+  become: true
+  file:
+    path: "{{nfs_dir}}"
+    state: directory
+    mode: 0777
+  when: inventory_hostname != groups['all'][0]
+
+- name: NFS-client | set fstab
+  become: true
+  lineinfile:
+    path: /etc/fstab
+    line: "{{ hostvars[groups['all'][0]]['ansible_default_ipv4']['address'] }}:{{ nfs_dir }} {{ nfs_dir }} nfs defaults 0 0"
+    state: present
+  when: inventory_hostname != groups['all'][0]
+
+- name: NFS-client | mount nfs
+  become: true
+  mount:
+    path: "{{nfs_dir}}"
+    src: "{{ hostvars[groups['all'][0]]['ansible_default_ipv4']['address'] }}:{{nfs_dir}}"
+    fstype: nfs
+    state: mounted
+  when: inventory_hostname != groups['all'][0]
+
