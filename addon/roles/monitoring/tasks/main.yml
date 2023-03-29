@@ -1,0 +1,31 @@
+- name: monitoring | create nfs dir
+  become: true
+  file:
+    path: /tmp/monitoring/prometheus
+    state: directory
+    mode: 0777
+  when: inventory_hostname == groups['all'][0]
+
+- name: monitoring | Copy Prometheus values 
+  template:
+    src: prometheus.yaml
+    dest: /tmp/monitoring/prometheus/prometheus.yaml
+  when: inventory_hostname == groups['all'][0]
+
+- name: monitoring | helm repo update 
+  kubernetes.core.helm_repository:
+    name: prometheus-community 
+    repo_url: https://prometheus-community.github.io/helm-charts 
+  when: inventory_hostname == groups['all'][0]
+
+- name: monitoring | Deploy helm repo
+  kubernetes.core.helm:
+    name: kube-prometheus
+    state: present
+    chart_ref: prometheus-community/kube-prometheus-stack 
+    chart_version: 39.12.1 
+    release_namespace: "{{monitoring_namespace}}"
+    create_namespace: true
+    values_files:
+    - /tmp/monitoring/prometheus/prometheus.yaml
+  when: inventory_hostname == groups['all'][0]

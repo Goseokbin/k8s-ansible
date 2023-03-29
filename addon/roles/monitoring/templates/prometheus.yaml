@@ -1,0 +1,16 @@
+grafana:
+  enabled: true
+  initChownData:
+    enabled: false
+  adminPassword: "{{ grafana_pw }}"
+  persistence:
+    enabled: true
+    type: pvc
+    storageClassName: "{{ monitoring_storageclass}}"
+    size: 10Gi
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    hosts:
+      - seokbin.grafana.com
+      

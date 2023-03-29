@@ -1,0 +1,3 @@
+grafana_pw: "admin00!"
+monitoring_storageclass: nfs-client
+monitoring_namespace: "monitoring"

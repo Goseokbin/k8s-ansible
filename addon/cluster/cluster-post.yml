@@ -5,3 +5,4 @@
   - {role: ../roles/nfs, tags: set_nfs}
   - {role: ../roles/helm, tags: set_helm}
   - {role: ../roles/nfs-csi, tags: set_nfs_csi}
+  - {role: ../roles/monitoring, tags: deploy_monitoring}
