@@ -1,0 +1,58 @@
+- name: teleport Install Teleport
+  become: true
+  vars:
+    teleport_repo_url: "https://yum.releases.teleport.dev/{{ ansible_distribution | lower }}/{{ ansible_distribution_version }}/{{ ansible_architecture }}/stable/v11/teleport.repo"
+  yum_repository:
+    name: teleport
+    description: Teleport YUM repository
+    baseurl: "{{ teleport_repo_url }}"
+    gpgcheck: yes
+    gpgkey: "{{ teleport_repo_url }}.key"
+    enabled: yes
+  when: teleport is not defined or teleport.results[0].failed
+
+- name: teleport | Install Teleport package
+  become: true
+  yum:
+    name: teleport
+    state: present
+  when: teleport is not defined or teleport.results[0].failed
+- name: teleport | Checking teleport config stats
+  stat:
+    path: { teleport_config_dir }
+  register: teleport_config
+  when: teleport_token is defined
+
+- name: teleport | Remove Exsits config file
+  shell: rm -rf /root/.config
+  ignore_errors: true
+  register: remove_output
+- debug:
+    msg: "{{ remove_output.stdout}}"
+
+- name: teleport | Generate teleport config
+  shell: teleport configure --output=$HOME/.config/node_config.yaml --roles=node --token={{ teleport_token }} --auth-server={{ teleport_service_url }} --data-dir=$HOME/.config
+  when: teleport_token is defined 
+  ignore_errors: true
+  register: teleport_config_file
+
+- name: teleport | Generate systemd service for teleport
+  template:
+    src: teleport.service.j2
+    dest: /etc/systemd/system/teleport.service
+    mode: 0644
+  when: teleport_config_file.changed
+
+- name: teleport | Ensure teleport is started and enabled
+  systemd:
+    name: teleport
+    daemon_reload: yes
+    enabled: yes
+    state: started
+  when: teleport_config_file.changed
+
+- name: teleport | Start teleport Service
+  systemd:
+    name: teleport
+    state: restarted
+    daemon-reload: yes
